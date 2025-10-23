@@ -14,21 +14,20 @@ def execute(filters=None):
     supplier = filters.get("supplier")
     supplier_grp = filters.get("supplier_group")
     data = []
-    
+
     columns = [
         {
             "fieldname": "voucher_type",
             "label": "Voucher Type",
             "fieldtype": "Data",
             "width": 200,
-
         },
         {
             "fieldname": "voucher_no",
             "label": "Voucher No",
             "fieldtype": "Link",
             "width": 200,
-            "options": VoucherType
+            "options": VoucherType,
         },
         {"fieldname": "party", "label": "Party", "fieldtype": "Data", "width": 200},
         {
@@ -56,7 +55,12 @@ def execute(filters=None):
             "fieldtype": "Data",
             "width": 200,
         },
-        {"fieldname": "actions", "label": "Actions", "fieldtype": "Data", "width": 200, },
+        {
+            "fieldname": "actions",
+            "label": "Actions",
+            "fieldtype": "Data",
+            "width": 200,
+        },
         {
             "fieldname": "view_items",
             "label": "View Items",
@@ -76,8 +80,8 @@ def execute(filters=None):
             condition["customer"] = customer
 
         if status:
-            condition['status'] = status
-            
+            condition["status"] = status
+
         sales_order = frappe.db.get_all(
             "Sales Order",
             filters=condition,
@@ -142,8 +146,8 @@ def execute(filters=None):
             condition["customer"] = customer
 
         if status:
-            condition['status'] = status
-            
+            condition["status"] = status
+
         sales_invoice = frappe.db.get_all(
             "Sales Invoice",
             filters=condition,
@@ -210,8 +214,8 @@ def execute(filters=None):
             condition["supplier"] = supplier
 
         if status:
-            condition['status'] = status
-            
+            condition["status"] = status
+
         purchase_order = frappe.db.get_all(
             "Purchase Order",
             filters=condition,
@@ -276,7 +280,7 @@ def execute(filters=None):
             condition["supplier"] = supplier
 
         if status:
-            condition['status'] = status
+            condition["status"] = status
 
         purchase_invoice = frappe.db.get_all(
             "Purchase Invoice",
@@ -343,8 +347,8 @@ def execute(filters=None):
             condition["customer"] = customer
 
         if status:
-            condition['status'] = status
-            
+            condition["status"] = status
+
         delivery_note = frappe.db.get_all(
             "Delivery Note",
             filters=condition,
@@ -403,8 +407,8 @@ def execute(filters=None):
             condition["supplier"] = supplier
 
         if status:
-            condition['status'] = status
-            
+            condition["status"] = status
+
         purchase_receipt = frappe.db.get_all(
             "Purchase Receipt",
             filters=condition,
@@ -455,16 +459,6 @@ def execute(filters=None):
                 )
 
     return columns, data
-
-
-
-
-
-
-
-
-
-
 
 
 # sql_query = frappe.db.sql("""

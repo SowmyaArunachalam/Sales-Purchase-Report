@@ -1,54 +1,7 @@
 // Copyright (c) 2025,   and contributors
 // For license information, please see license.txt
 let new_data = {};
-// let fields = [
-// 		{
-// 			fieldtype: "Data",
-// 			fieldname: "docname",
-// 			read_only: 0,
-// 			hidden: 1,
-// 		},
-// 		{
-// 			fieldname: "item_code",
-// 			fieldtype: "Link",
-// 			in_list_view: 1,
-// 			label: "Item Code",
-// 			read_only: 1,
-// 			disabled: 0,
-// 		},
-// 		{
-// 			fieldname: "item_name",
-// 			fieldtype: "Link",
-// 			in_list_view: 1,
-// 			label: "Item Name",
-// 			read_only: 1,
-// 			disabled: 0,
-// 		},
-// 		{
-// 			fieldtype: "Link",
-// 			fieldname: "uom",
-// 			options: "UOM",
-// 			read_only: 1,
-// 			label: __("UOM"),
-// 			reqd: 1,
-// 		},
-// 		{
-// 			fieldname: "qty",
-// 			fieldtype: "Float",
-// 			label: "Quantity",
-// 			in_list_view: 1,
-// 			default: 0,
-// 			read_only: 0,
-// 		},
-// 		{
-// 			fieldname: "rate",
-// 			fieldtype: "Currency",
-// 			in_list_view: 1,
-// 			label: "Rate(INR)",
-// 			read_only: 1,
-// 			default: 0,
-// 		},
-// 	]
+
 frappe.query_reports["Transaction List"] = {
 	get_datatable_options(options) {
 		return Object.assign(options, {
@@ -70,64 +23,9 @@ frappe.query_reports["Transaction List"] = {
 				"Purchase Receipt",
 			],
 			reqd: 0,
+
 			on_change: function (query_report) {
-				console.log("Type --------------");
-				query_report.page.clear_actions_menu();
-
-				//to get checked items
-				action_list(query_report);
-				frappe.query_report.refresh();
-
-				//filter for status
-				let filters = frappe.query_report.filters;
-				let dtype = frappe.query_report.get_filter_value("voucher_type");
-				let options = {
-					"Sales Order": [
-						"On Hold",
-						"To Deliver and Bill",
-						"To Bill",
-						"To Deliver",
-						"Completed",
-					],
-					"Sales Invoice": [
-						"Return",
-						"Credit Note Issued",
-						"Paid",
-						"Partly Paid",
-						"Unpaid",
-						"Unpaid and Discounted",
-						"Partly Paid and Discounted",
-						"Overdue and Discounted",
-						"Overdue",
-						"Internal Transfer",
-					],
-					"Purchase Order": [
-						"On Hold",
-						"To Receive and Bill",
-						"To Bill",
-						"To Receive",
-						"Completed",
-						"Delivered",
-					],
-					"Purchase Invoice": [
-						"Return",
-						"Debit Note Issued",
-						"Paid",
-						"Partly Paid",
-						"Unpaid",
-						"Overdue",
-						"Internal Transfer",
-					],
-					"Delivery Note": ["To Bill", "Completed", "Return Issued"],
-					"Purchase Receipt": ["Partly Billed", "To Bill", "Completed", "Return Issued"],
-				};
-				filters.forEach((d) => {
-					if (d.fieldname == "status") {
-						d.df.options = options[dtype].join("\n");
-						d.set_input(d.df.options);
-					}
-				});
-				frappe.query_report.refresh();
+				action(query_report);
 			},
 		},
 		{
@@ -185,22 +83,30 @@ frappe.query_reports["Transaction List"] = {
 				'eval: ["Purchase Order", "Purchase Invoice", "Purchase Receipt"].includes(doc.voucher_type)',
 		},
 	],
+	onload: function (query_report) {
+		action(query_report);
+	},
 
 	formatter: function (value, row, column, data, default_formatter) {
 		value = default_formatter(value, row, column, data);
 
 		const key = data.voucher_no;
 		new_data[key] = data;
+		if (data.voucher_type == "Sales Order" || data.voucher_type == "Purchase Order") {
+			btn_name = "Update Items";
+		} else {
+			btn_name = "Return items";
+		}
 
 		if (column.fieldname === "actions") {
 			value = `
-						<button class="btn mb-2 btn-outline-dark btn-light btn-xs"
-							
-							onclick=" so_actions('${key}')">
+				<button class="btn mb-2 btn-outline-dark btn-light btn-xs"
 
-							Update Items
-						</button>
-						`;
+					onclick=" so_actions('${key}')">
+
+					${btn_name}
+				</button>
+				`;
 		}
 
 		if (column.fieldname === "view_items") {
@@ -275,77 +181,199 @@ function so_actions(key) {
 			fieldname: "conversion_factor",
 			label: __("Conversion Factor"),
 		});
-	}
 
-	frappe.call({
-		method: "transaction.get_data.so_data",
+		frappe.call({
+			method: "transaction.get_data.so_data",
 
-		args: {
-			doc: data,
-		},
-		callback: function (r) {
-			let query = r.message;
+			args: {
+				doc: data,
+			},
+			callback: function (r) {
+				let query = r.message;
 
-			if (r.message) {
-				query.forEach((element) => {
-					list_item.push({
-						docname: element.name,
-						name: element.name,
-						item_code: element.item_code,
-						item_name: element.item_name,
-						qty: element.qty,
-						rate: element.rate,
-						schedule_date: element.schedule_date,
-						delivery_date: element.delivery_date,
-						uom: element.uom,
+				if (r.message) {
+					query.forEach((element) => {
+						list_item.push({
+							docname: element.name,
+							name: element.name,
+							item_code: element.item_code,
+							item_name: element.item_name,
+							qty: element.qty,
+							rate: element.rate,
+							schedule_date: element.schedule_date,
+							delivery_date: element.delivery_date,
+							uom: element.uom,
+						});
 					});
-				});
-			}
+				}
 
-			let dialog = new frappe.ui.Dialog({
-				title: "Item Table",
-				size: "large",
+				let dialog = new frappe.ui.Dialog({
+					title: "Item Table",
+					size: "large",
 
-				fields: [
-					{
-						label: "Table",
-						fieldname: "table",
-						fieldtype: "Table",
-						cannot_add_rows: true,
-						in_place_edit: false,
-						data: query,
-						fields: fields,
+					fields: [
+						{
+							label: "Table",
+							fieldname: "table",
+							fieldtype: "Table",
+							cannot_add_rows: true,
+							in_place_edit: false,
+							data: list_item,
+							fields: fields,
+						},
+					],
+
+					primary_action_label: "Submit",
+					primary_action(values) {
+						debugger;
+						frappe.call({
+							method: "erpnext.controllers.accounts_controller.update_child_qty_rate",
+							freeze: true,
+
+							args: {
+								parent_doctype: data.voucher_type,
+
+								trans_items: values.table,
+
+								parent_doctype_name: data.voucher_no,
+
+								child_docname: "items",
+							},
+
+							callback: function (r) {
+								frappe.query_report.refresh();
+								console.log("Updated");
+							},
+						});
+						dialog.hide();
 					},
-				],
+				});
+				dialog.show();
+			},
+		});
+	} else {
+		frappe.call({
+			method: "transaction.get_data.so_data",
 
-				primary_action_label: "Submit",
-				primary_action(values) {
-					debugger;
-					frappe.call({
-						method: "erpnext.controllers.accounts_controller.update_child_qty_rate",
-						freeze: true,
+			args: {
+				doc: data,
+			},
 
-						args: {
-							parent_doctype: data.voucher_type,
-
-							trans_items: values.table,
-
-							parent_doctype_name: data.voucher_no,
-
-							child_docname: "items",
-						},
-
-						callback: function (r) {
-							frappe.query_report.refresh();
-							console.log("Updated");
-						},
+			callback: function (r) {
+				let query = r.message;
+				console.log(query);
+				if (r.message) {
+					query.forEach((element) => {
+						let neg_qty = -Math.abs(Number(element.qty));
+						if (data.voucher_type == "Purchase Invoice") {
+							list_item.push({
+								docname: element.name,
+								name: element.name,
+								item_code: element.item_code,
+								item_name: element.item_name,
+								qty: neg_qty,
+								rate: element.rate,
+								purchase_order: element.purchase_order,
+								po_detail: element.po_detail,
+								purchase_invoice_item: element.name,
+								// schedule_date: element.schedule_date,
+								delivery_date: element.delivery_date,
+								uom: element.uom,
+							});
+						} else if (data.voucher_type == "Sales Invoice") {
+							list_item.push({
+								docname: element.name,
+								name: element.name,
+								item_code: element.item_code,
+								item_name: element.item_name,
+								qty: neg_qty,
+								rate: element.rate,
+								sales_order: element.sales_order,
+								so_detail: element.so_detail,
+								sales_invoice_item: element.name,
+								// schedule_date: element.schedule_date,
+								delivery_date: element.delivery_date,
+								uom: element.uom,
+							});
+						} else if (data.voucher_type == "Purchase Receipt") {
+							list_item.push({
+								docname: element.name,
+								name: element.name,
+								item_code: element.item_code,
+								item_name: element.item_name,
+								qty: neg_qty,
+								rate: element.rate,
+								purchase_order: element.purchase_order,
+								purchase_invoice: element.purchase_invoice,
+								purchase_order_item: element.purchase_order_item,
+								purchase_receipt_item: element.name,
+								// schedule_date: element.schedule_date,
+								delivery_date: element.delivery_date,
+								uom: element.uom,
+							});
+						} else if (data.voucher_type == "Delivery Note") {
+							list_item.push({
+								docname: element.name,
+								name: element.name,
+								item_code: element.item_code,
+								item_name: element.item_name,
+								qty: neg_qty,
+								rate: element.rate,
+								against_sales_invoice: element.against_sales_invoice,
+								si_detail: element.si_detail,
+								dn_detail: element.name,
+								so_detail: element.so_detail,
+								// schedule_date: element.schedule_date,
+								delivery_date: element.delivery_date,
+								uom: element.uom,
+							});
+						}
 					});
-					dialog.hide();
-				},
-			});
-			dialog.show();
-		},
-	});
+
+					console.log(list_item);
+				}
+
+				let dialog = new frappe.ui.Dialog({
+					title: "Item Table",
+					size: "large",
+
+					fields: [
+						{
+							label: "Table",
+							fieldname: "table",
+							fieldtype: "Table",
+							cannot_add_rows: true,
+							in_place_edit: false,
+							data: list_item,
+							fields: fields,
+						},
+					],
+
+					primary_action_label: "Submit",
+					primary_action(values) {
+						// debugger;
+						console.log(values);
+						frappe.call({
+							method: "transaction.get_data.debit_note",
+							freeze: true,
+
+							args: {
+								dtype: data.voucher_type,
+								item1: data.voucher_no,
+								args: dialog.get_values(),
+							},
+
+							callback: function (r) {
+								frappe.set_route("Form", data.voucher_type, r.message);
+							},
+						});
+						dialog.hide();
+					},
+				});
+				dialog.show();
+			},
+		});
+	}
 }
 
 function show_items(type, doc_name) {
@@ -614,4 +642,65 @@ function pay_entry(report) {
 			},
 		});
 	});
+}
+
+function action(query_report) {
+	console.log("Type --------------");
+	query_report.page.clear_actions_menu();
+	//add element to action
+	action_list(query_report);
+	// frappe.query_report.refresh();
+
+	//filter for status
+	let filters = frappe.query_report.filters;
+	let dtype = frappe.query_report.get_filter_value("voucher_type");
+	let options = {
+		"Sales Order": ["On Hold", "To Deliver and Bill", "To Bill", "To Deliver", "Completed"],
+		"Sales Invoice": [
+			"Return",
+			"Credit Note Issued",
+			"Paid",
+			"Partly Paid",
+			"Unpaid",
+			"Unpaid and Discounted",
+			"Partly Paid and Discounted",
+			"Overdue and Discounted",
+			"Overdue",
+			"Internal Transfer",
+		],
+		"Purchase Order": [
+			"On Hold",
+			"To Receive and Bill",
+			"To Bill",
+			"To Receive",
+			"Completed",
+			"Delivered",
+		],
+		"Purchase Invoice": [
+			"Return",
+			"Debit Note Issued",
+			"Paid",
+			"Partly Paid",
+			"Unpaid",
+			"Overdue",
+			"Internal Transfer",
+		],
+		"Delivery Note": ["To Bill", "Completed", "Return Issued"],
+		"Purchase Receipt": ["Partly Billed", "To Bill", "Completed", "Return Issued"],
+	};
+	filters.forEach((d) => {
+		if (d.fieldname == "status") {
+			// d.df.options = options[dtype].join("\n");
+			// d.set_input(d.df.options);
+			if (options[dtype]) {
+				d.df.options = options[dtype].join("\n");
+				d.set_input(d.df.options);
+			} else {
+				console.warn(`No options found for dtype: ${dtype}`);
+				d.df.options = "";
+				d.set_input("");
+			}
+		}
+	});
+	frappe.query_report.refresh();
 }
