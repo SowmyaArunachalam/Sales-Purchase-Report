@@ -15,6 +15,12 @@ def execute(filters=None):
     supplier_grp = filters.get("supplier_group")
     data = []
 
+    party_type = (
+        "Customer"
+        if VoucherType in ("Sales Order", "Sales Invoice", "Delivery Note")
+        else "Supplier"
+    )
+
     columns = [
         {
             "fieldname": "voucher_type",
@@ -29,7 +35,13 @@ def execute(filters=None):
             "width": 200,
             "options": VoucherType,
         },
-        {"fieldname": "party", "label": "Party", "fieldtype": "Data", "width": 200},
+        {
+            "fieldname": "party",
+            "label": "Party",
+            "fieldtype": "Link",
+            "width": 200,
+            "options": party_type,
+        },
         {
             "fieldname": "party_group",
             "label": "Party Group",
@@ -50,12 +62,6 @@ def execute(filters=None):
             "width": 200,
         },
         {
-            "fieldname": "outstanding_amount",
-            "label": "Outstanding Amount",
-            "fieldtype": "Data",
-            "width": 200,
-        },
-        {
             "fieldname": "actions",
             "label": "Actions",
             "fieldtype": "Data",
@@ -68,6 +74,13 @@ def execute(filters=None):
             "width": 200,
         },
     ]
+    if VoucherType in ("Sales Invoice", "Purchase Invoice"):
+        columns.insert(-3,{
+            "fieldname": "outstanding_amount",
+            "label": "Outstanding Amount",
+            "fieldtype": "Data",
+            "width": 200
+        })
 
     if VoucherType == "Sales Order":
         print(VoucherType)

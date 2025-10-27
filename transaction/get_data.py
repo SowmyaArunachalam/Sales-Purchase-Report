@@ -3,7 +3,9 @@ import json
 
 
 from frappe.utils import today
+
 current_date = today()
+
 
 @frappe.whitelist()
 def view_items(doctype, doc_name):
@@ -160,11 +162,17 @@ def view_items(doctype, doc_name):
 
 @frappe.whitelist()
 def so_data(doc):
+    
     doc = json.loads(doc)
     doc = frappe._dict(doc)
+    
     print(doc)
+    
+    if doc.status == "Return":
+        frappe.throw("It's a Return Entry...")
+        
     if doc.voucher_type == "Sales Order":
-
+        print("==============")
         item = frappe.db.get_all(
             "Sales Order Item",
             filters={"parent": doc.voucher_no},
@@ -201,6 +209,7 @@ def so_data(doc):
             "Purchase Invoice Item",
             filters={"parent": doc.voucher_no},
             fields=[
+                "name",
                 "item_code",
                 "item_name",
                 "qty",
@@ -208,11 +217,12 @@ def so_data(doc):
                 "purchase_order",
                 "po_detail",
                 "uom",
-                "conversion_factor"
+                "conversion_factor",
             ],
         )
+        print(item)
         return item
-    
+
     elif doc.voucher_type == "Sales Invoice":
         item = frappe.db.get_all(
             "Sales Invoice Item",
@@ -225,11 +235,11 @@ def so_data(doc):
                 "rate",
                 "sales_order",
                 "so_detail",
-                "sales_invoice_item",
                 "uom",
-                "conversion_factor"
+                "conversion_factor",
             ],
         )
+        print(item)
         return item
     elif doc.voucher_type == "Purchase Receipt":
         item = frappe.db.get_all(
@@ -245,7 +255,7 @@ def so_data(doc):
                 "purchase_invoice",
                 "purchase_order_item",
                 "uom",
-                "conversion_factor"
+                "conversion_factor",
             ],
         )
         return item
@@ -263,11 +273,12 @@ def so_data(doc):
                 "si_detail",
                 "so_detail",
                 "uom",
-                "conversion_factor"
+                "conversion_factor",
             ],
         )
         print(item)
         return item
+
 
 @frappe.whitelist()
 def debit_note(dtype, item1, args):
@@ -279,25 +290,25 @@ def debit_note(dtype, item1, args):
     print(doc.items)
     # print(doc)
     doc1 = frappe.new_doc(doc.doctype)
-    
+
     if doc.doctype == "Sales Invoice":
         doc1.customer = doc.customer
         doc1.selling_price_list = "Standard Selling"
         doc1.select_print_heading = "Credit Note"
-        
+
     elif doc.doctype == "Purchase Invoice":
         doc1.supplier = doc.supplier
         doc1.buying_price_list = "Standard Buying"
         doc1.select_print_heading = "Debit Note"
-        
+
     elif doc.doctype == "Purchase Receipt":
         doc1.supplier = doc.supplier
         doc1.buying_price_list = "Standard Buying"
-        
+
     elif doc.doctype == "Delivery Note":
         doc1.customer = doc.customer
         doc1.selling_price_list = "Standard Selling"
-        
+
     doc1.return_against = doc.name
     doc1.company = doc.company
     doc1.posting_date = current_date
@@ -308,33 +319,58 @@ def debit_note(dtype, item1, args):
     print(args.table)
     for item in args.table:
         new_dict = {
-                "item_code": item["item_code"],
-                "item_name": item["item_name"],
-                "qty": item["qty"],
-                "uom": item["uom"],
-                "rate": item["rate"],
+            "item_code": item["item_code"],
+            "item_name": item["item_name"],
+            "qty": item["qty"],
+            "uom": item["uom"],
+            "rate": item["rate"],
         }
         print(new_dict)
-        if type == "Sales Invoice":
-            new_dict.update({"sales_order":  item["sales_order"], "so_detail": item["so_detail"], "sales_invocie_item": item["sales_invocie_item"]})
-        elif type == "Purchase Invoice":
-            new_dict.update({"purchase_order": item["purchase_order"], "po_detail": item["po_detail"], "purchase_invoice_item": item["purchase_invoice_item"]})
-        elif type == "Purchase Receipt":
-            new_dict.update({"purchase_order": item["purchase_order"], "purchase_invoice": item["purchase_invoice"], "purchase_order_item": item["purchase_order_item"], "purchase_receipt_item": item["purchase_receipt_item"]})
-        elif type == "Delivery Note":
-            new_dict.update({"against_sales_invoice": item["against_sales_invoice"], "si_detail": item["si_detail"], "dn_detail": item["dn_detail"]})
+        if dtype == "Sales Invoice":
+            new_dict.update(
+                {
+                    "sales_order": item["sales_order"],
+                    "so_detail": item["so_detail"],
+                    "sales_invoice_item": item["sales_invoice_item"],
+                }
+            )
+        elif dtype == "Purchase Invoice":
+            new_dict.update(
+                {
+                    "purchase_order": item["purchase_order"],
+                    "po_detail": item["po_detail"],
+                    "purchase_invoice_item": item["purchase_invoice_item"],
+                }
+            )
+        elif dtype == "Purchase Receipt":
+            new_dict.update(
+                {
+                    "purchase_order": item["purchase_order"],
+                    "purchase_invoice": item["purchase_invoice"],
+                    "purchase_order_item": item["purchase_order_item"],
+                    "purchase_receipt_item": item["purchase_receipt_item"],
+                }
+            )
+        elif dtype == "Delivery Note":
+            new_dict.update(
+                {
+                    "against_sales_invoice": item["against_sales_invoice"],
+                    "si_detail": item["si_detail"],
+                    "dn_detail": item["dn_detail"],
+                }
+            )
 
         doc1.append("items", new_dict)
-    doc1.insert()
+    # doc1.insert()
+    doc1.save()
+    
     return doc1.name
-
 
 # @frappe.whitelist()
 # def pur_invoice(id):
 #     # data = frappe.get_doc("Purchase Order", id)
 #     doc1 = get_mapped_purchase_invoice(id)
 #     doc1.insert()
-
 
 @frappe.whitelist()
 def checked_items(type, selected_value):
@@ -344,6 +380,7 @@ def checked_items(type, selected_value):
     placeholders = ", ".join(["%s"] * len(id_list))
     if type == "Purchase Order":
         sql_query = f"""select
+                    porder.parent,
                     porder.name,
                     porder.item_code,
                     porder.item_name,
@@ -361,6 +398,7 @@ def checked_items(type, selected_value):
     elif type == "Sales Order":
         sql_query = f"""
                 select
+                    sorder.parent,
                     sorder.name,
                     sorder.item_code,
                     sorder.item_name,
@@ -380,13 +418,16 @@ def checked_items(type, selected_value):
     elif type == "Sales Invoice":
         sql_query = f"""
                 select
+                    sinvoice.parent,
                     sinvoice.name,
                     sinvoice.item_code,
                     sinvoice.item_name,
                     sinvoice.rate,
                     sinvoice.qty - ifnull(sum(note.qty), 0) as qty,
-                    sinvoice.uom
-                    
+                    sinvoice.uom,
+                    sinvoice.sales_order,
+                    sinvoice.so_detail,
+                    sinvoice.parent
                 from `tabSales Invoice Item` sinvoice
                 left join `tabDelivery Note Item` note
                     on sinvoice.name = note.si_detail
@@ -398,6 +439,7 @@ def checked_items(type, selected_value):
     elif type == "Purchase Invoice":
         sql_query = f"""
                 select
+                    pinvoice.parent,
                     pinvoice.name,
                     pinvoice.item_code,
                     pinvoice.item_name,
@@ -463,7 +505,7 @@ def new_invoice(type, item1, args=None):
             "item_name": item["item_name"],
             "qty": item["qty"],
             "uom": item["uom"],
-            "rate": item["rate"]
+            "rate": item["rate"],
         }
         print(new_dict)
         if type == "Sales Order":
@@ -483,6 +525,7 @@ def new_invoice(type, item1, args=None):
     doc1.insert()
     return doc1.name
 
+
 # @frappe.whitelist()
 # def del_note(type):
 #     doc1 = frappe.get_doc(type,id)
@@ -491,12 +534,16 @@ def new_invoice(type, item1, args=None):
 #     new_value.insert()
 #     return new_value
 
+
 @frappe.whitelist()
 def del_note(type, item1, args=None):
     doc = frappe.get_doc(type, item1)
     doc = frappe.parse_json(doc)
     args = frappe.parse_json(args)
 
+    # if(doc.status == "Paid"):
+    #     frappe.throw("Already Paid")
+    
     doc1 = frappe.new_doc("Delivery Note")
     doc1.customer = doc.customer
     doc1.selling_price_list = doc.selling_price_list
@@ -512,22 +559,23 @@ def del_note(type, item1, args=None):
 
     for item in args.table:
         print(item)
-        doc1.append(
-            "items",
-            {
-                "item_code": item["item_code"],
-                "item_name": item["item_name"],
-                "qty": item["qty"],
-                "uom": item["uom"],
-                # "price_list_rate":item['price_list_rate'],
-                # "base_price_list_rate":item['base_price_list_rate'],
-                "rate": item["rate"],
-                # "amount":item['amount'],
-                # "cost_center": item['cost_center'],
-                "purchase_order": item["purchase_order"],
-                "po_detail": item["po_detail"],
-            },
-        )
+        
+        new_dict = {
+            "item_code": item["item_code"],
+            "item_name": item["item_name"],
+            "qty": item["qty"],
+            "uom": item["uom"],
+            "rate": item["rate"],
+        }
+        print(new_dict)
+        if type == "Sales Invoice":
+            new_dict.update({"si_detail": item["name"], "so_detail": item["so_detail"], "against_sales_invoice": item["parent"], "against_sales_order": item["sales_order"]})
+        elif type == "Purchase Invoice":
+            new_dict.update({"purchase_order": doc.name, "po_detail": item["name"]})
+
+        doc1.append("items", new_dict)
+        print(new_dict)
+        
 
     doc1.total_qty = doc.total_qty
     doc1.total = doc.total
@@ -660,19 +708,12 @@ def payment(type, selected_value):
         outstanding_total += doc.outstanding_amount
     # print(doc1.meta.get_table_fields())
 
-    doc1.paid_amount = outstanding_total or 0
+    doc1.paid_amount = outstanding_total 
     doc1.received_amount = total
 
     doc1.insert()
 
     return doc1.name
-
-
-
-
-
-
-
 
 
 # sql_query = f"""select
@@ -689,8 +730,8 @@ def payment(type, selected_value):
 #                 where porder.parent in ({placeholders})
 #                 group by porder.name, porder.item_code
 #                 having qty >0"""
-                
-                
+
+
 # query = (
 #     frappe.qb.from(PurchaseOrderItem)
 #     .left_join(PurchaseInvoiceItem)

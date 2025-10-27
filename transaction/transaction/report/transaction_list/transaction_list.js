@@ -25,6 +25,7 @@ frappe.query_reports["Transaction List"] = {
 			reqd: 0,
 
 			on_change: function (query_report) {
+				checked_rows = [];
 				action(query_report);
 			},
 		},
@@ -126,6 +127,8 @@ function so_actions(key) {
 	let data = new_data[key];
 	list_item = [];
 
+	// console.log(data)
+	// console.log(data.voucher_type)
 	let fields = [
 		{
 			fieldtype: "Data",
@@ -171,7 +174,7 @@ function so_actions(key) {
 	if (data.voucher_type == "Sales Order" || data.voucher_type == "Purchase Order") {
 		fields.splice(2, 0, {
 			fieldtype: "Date",
-			fieldname: data.voucher_type == "Sales Order" ? "delivery_date" : "schedule_date",
+			fieldname: data.voucher_type == "Sales Invoice" ? "delivery_date" : "schedule_date",
 			in_list_view: 1,
 			label: data.voucher_type == "Sales Order" ? __("Delivery Date") : __("Reqd by date"),
 			reqd: 1,
@@ -205,6 +208,8 @@ function so_actions(key) {
 							uom: element.uom,
 						});
 					});
+
+					console.log(query);
 				}
 
 				let dialog = new frappe.ui.Dialog({
@@ -252,6 +257,75 @@ function so_actions(key) {
 			},
 		});
 	} else {
+		if (data.voucher_type == "Purchase Invoice") {
+			fields.splice(2, 0, {
+				fieldtype: "Data",
+				fieldname: "purchase_order",
+				reqd: 1,
+			});
+			fields.splice(3, 0, {
+				fieldtype: "Data",
+				fieldname: "po_detail",
+			});
+			fields.splice(4, 0, {
+				fieldtype: "Data",
+				fieldname: "purchase_invoice_item",
+			});
+			console.log("fields", fields);
+		} else if (data.voucher_type == "Sales Invoice") {
+			fields.splice(2, 0, {
+				fieldtype: "Data",
+				fieldname: "sales_order",
+				reqd: 1,
+			});
+			fields.splice(3, 0, {
+				fieldtype: "Data",
+				fieldname: "so_detail",
+			});
+			fields.splice(4, 0, {
+				fieldtype: "Data",
+				fieldname: "sales_invoice_item",
+			});
+			console.log("fields", fields);
+		} else if (data.voucher_type == "Delivery Note") {
+			fields.splice(2, 0, {
+				fieldtype: "Data",
+				fieldname: "against_sales_invoice",
+				reqd: 1,
+			});
+			fields.splice(3, 0, {
+				fieldtype: "Data",
+				fieldname: "si_detail",
+			});
+			fields.splice(4, 0, {
+				fieldtype: "Data",
+				fieldname: "dn_detail",
+			});
+			fields.splice(5, 0, {
+				fieldtype: "Data",
+				fieldname: "so_detail",
+			});
+			console.log("fields", fields);
+		} else if (data.voucher_type == "Purchase Receipt") {
+			fields.splice(2, 0, {
+				fieldtype: "Data",
+				fieldname: "purchase_order",
+				reqd: 1,
+			});
+			fields.splice(3, 0, {
+				fieldtype: "Data",
+				fieldname: "purchase_invoice",
+			});
+			fields.splice(4, 0, {
+				fieldtype: "Data",
+				fieldname: "purchase_order_item",
+			});
+			fields.splice(5, 0, {
+				fieldtype: "Data",
+				fieldname: "purchase_receipt_item",
+			});
+			console.log("fields", fields);
+		}
 		frappe.call({
 			method: "transaction.get_data.so_data",
 
@@ -261,7 +335,7 @@ function so_actions(key) {
 
 			callback: function (r) {
 				let query = r.message;
-				console.log(query);
+				console.log("query   ", query);
 				if (r.message) {
 					query.forEach((element) => {
 						let neg_qty = -Math.abs(Number(element.qty));
@@ -277,13 +351,12 @@ function so_actions(key) {
 								po_detail: element.po_detail,
 								purchase_invoice_item: element.name,
 								// schedule_date: element.schedule_date,
-								delivery_date: element.delivery_date,
 								uom: element.uom,
 							});
 						} else if (data.voucher_type == "Sales Invoice") {
 							list_item.push({
-								docname: element.name,
-								name: element.name,
+								// 	docname: element.name,
+								// 	name: element.name,
 								item_code: element.item_code,
 								item_name: element.item_name,
 								qty: neg_qty,
@@ -313,8 +386,8 @@ function so_actions(key) {
 							});
 						} else if (data.voucher_type == "Delivery Note") {
 							list_item.push({
-								docname: element.name,
-								name: element.name,
+								// docname: element.name,
+								// name: element.name,
 								item_code: element.item_code,
 								item_name: element.item_name,
 								qty: neg_qty,
@@ -355,7 +428,7 @@ function so_actions(key) {
 						console.log(values);
 						frappe.call({
 							method: "transaction.get_data.debit_note",
-							freeze: true,
+							// freeze: true,
 
 							args: {
 								dtype: data.voucher_type,
@@ -464,15 +537,27 @@ function item_dialog(report, items_method, op_method, creation_type) {
 	let doc_type = report.get_filter_value("voucher_type");
 
 	let checked_rows_indexes = report.datatable.rowmanager.getCheckedRows();
-	let checked_rows = checked_rows_indexes.map((i) => report.data[i]);
-	fst_item = checked_rows[0];
 
+	if (checked_rows_indexes.length == 0) {
+		frappe.throw("Select any Entry...");
+	}
+
+
+	let checked_rows = checked_rows_indexes.map((i) => report.data[i]);
+
+	fst_item = checked_rows[0];
 	new_l = [];
+	console.log("--------------------------");
+
+	console.log("checked_rows", checked_rows);
 
 	checked_rows.forEach((person) => {
+		
 		if (person["party"] != fst_item["party"]) {
 			frappe.throw("Party should be same.");
 		}
+		
+		
 	});
 
 	frappe.call({
@@ -483,23 +568,134 @@ function item_dialog(report, items_method, op_method, creation_type) {
 		},
 		callback: function (r) {
 			let query = r.message;
-
+			console.log("Query", query)
 			if (r.message) {
 				query.forEach((element) => {
-					new_l.push({
-						name: element.name,
-						item_code: element.item_code,
-						item_name: element.item_name,
-						qty: element.qty,
-						rate: element.rate,
-						uom: element.uom,
-					});
+					if (doc_type == "Sales Invoice") {
+						new_l.push({
+							id: element.parent,
+							name: element.name,
+							item_code: element.item_code,
+							item_name: element.item_name,
+							qty: element.qty,
+							rate: element.rate,
+							uom: element.uom,
+							parent: element.parent,
+							sales_order: element.sales_order,
+							so_detail: element.so_detail,
+							si_detail: element.name
+						});
+					}
+					else if (doc_type == "Purchase Invoice") {
+						new_l.push({
+							id: element.parent,
+							name: element.name,
+							item_code: element.item_code,
+							item_name: element.item_name,
+							qty: element.qty,
+							rate: element.rate,
+							uom: element.uom,
+							parent: element.parent,
+							po_detail: element.po_detail,
+							purchase_order: element.purchase_order
+						});
+					}
+					else {
+						new_l.push({
+							id: element.parent,
+							name: element.name,
+							item_code: element.item_code,
+							item_name: element.item_name,
+							qty: element.qty,
+							rate: element.rate,
+							uom: element.uom
+
+						});
+					}
 				});
+			}
+
+			let fields = [
+				{
+					fieldtype: "Data",
+					fieldname: "name",
+					in_list_view: 1,
+					label: "ID",
+					read_only: 0,
+					hidden: 1,
+				},
+				{
+					fieldtype: "Data",
+					fieldname: "id",
+					in_list_view: 1,
+					label: "ID",
+					read_only: 1,
+				},
+				{
+					fieldname: "item_code",
+					fieldtype: "Link",
+					in_list_view: 1,
+					label: "Item Code",
+					read_only: 1,
+					disabled: 0,
+				},
+				{
+					fieldname: "item_name",
+					fieldtype: "Link",
+					in_list_view: 1,
+					label: "Item Name",
+					read_only: 1,
+					disabled: 0,
+				},
+				{
+					fieldtype: "Link",
+					fieldname: "uom",
+					options: "UOM",
+					read_only: 1,
+					label: __("UOM"),
+					reqd: 1,
+				},
+				{
+					fieldname: "qty",
+					fieldtype: "Float",
+					label: "Quantity",
+					in_list_view: 1,
+					default: 0,
+					read_only: 0,
+				},
+				{
+					fieldname: "rate",
+					fieldtype: "Currency",
+					in_list_view: 1,
+					label: "Rate(INR)",
+					read_only: 1,
+					default: 0,
+				},
+			];
+			if (doc_type == "Sales Invoice") {
+				fields.splice(2, 0, {
+					fieldtype: "Data",
+					fieldname: "against_sales_invoice",
+					reqd: 1,
+				});
+				fields.splice(3, 0, {
+					fieldtype: "Data",
+					fieldname: "against_sales_order",
+				});
+				fields.splice(4, 0, {
+					fieldtype: "Data",
+					fieldname: "si_detail",
+				});
+				fields.splice(4, 0, {
+					fieldtype: "Data",
+					fieldname: "so_detail",
+				});
+				console.log("fields", fields);
 			}
 
 			let dialog = new frappe.ui.Dialog({
 				title: "Item Table",
-				size: "large",
+				size: "extra-large",
 
 				fields: [
 					{
@@ -508,55 +704,8 @@ function item_dialog(report, items_method, op_method, creation_type) {
 						fieldtype: "Table",
 						cannot_add_rows: true,
 						in_place_edit: false,
-						data: query,
-						fields: [
-							{
-								fieldtype: "Data",
-								fieldname: "docname",
-								read_only: 0,
-								hidden: 1,
-							},
-							{
-								fieldname: "item_code",
-								fieldtype: "Link",
-								in_list_view: 1,
-								label: "Item Code",
-								read_only: 1,
-								disabled: 0,
-							},
-							{
-								fieldname: "item_name",
-								fieldtype: "Link",
-								in_list_view: 1,
-								label: "Item Name",
-								read_only: 1,
-								disabled: 0,
-							},
-							{
-								fieldtype: "Link",
-								fieldname: "uom",
-								options: "UOM",
-								read_only: 1,
-								label: __("UOM"),
-								reqd: 1,
-							},
-							{
-								fieldname: "qty",
-								fieldtype: "Float",
-								label: "Quantity",
-								in_list_view: 1,
-								default: 0,
-								read_only: 0,
-							},
-							{
-								fieldname: "rate",
-								fieldtype: "Currency",
-								in_list_view: 1,
-								label: "Rate(INR)",
-								read_only: 1,
-								default: 0,
-							},
-						],
+						data: new_l,
+						fields: fields,
 					},
 				],
 
@@ -617,12 +766,22 @@ function pay_entry(report) {
 		let checked_rows_indexes = report.datatable.rowmanager.getCheckedRows();
 		let checked_rows = checked_rows_indexes.map((i) => report.data[i]);
 		fst_item = checked_rows[0];
+		console.log(checked_rows_indexes);
 		console.log(checked_rows);
+
 		new_l = [];
 		console.log(fst_item["voucher_type"]);
 
 		console.log("--------------------");
 		checked_rows.forEach((person) => {
+			if(checked_rows_indexes.length == 1 && person["status"]== "Paid"){
+			frappe.throw("Already Paid...")
+			}
+			else{
+				checked_rows = checked_rows.filter(row => row.status != "Paid");
+				console.log(checked_rows);
+
+			}
 			if (person["party"] != fst_item["party"]) {
 				frappe.throw("Party should be same.");
 			}
