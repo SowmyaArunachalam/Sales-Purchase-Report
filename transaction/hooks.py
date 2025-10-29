@@ -147,6 +147,13 @@ app_license = "mit"
 
 # Scheduled Tasks
 # ---------------
+scheduler_events = {
+    "cron": {
+        "*/2 * * * *": [
+            "transaction.api.custom.Create_order"
+        ]
+    }
+}
 
 # scheduler_events = {
 # 	"all": [
@@ -165,6 +172,8 @@ app_license = "mit"
 # 		"transaction.tasks.monthly"
 # 	],
 # }
+
+
 
 # Testing
 # -------
